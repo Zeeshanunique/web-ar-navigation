@@ -1,23 +1,30 @@
 {
-  "name": "web-ar-navigation-backend",
+  "name": "ar-navigation-backend",
   "version": "1.0.0",
-  "description": "Web-Based AR Navigation System Backend",
+  "description": "Backend API for AR Navigation System",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "seed": "node scripts/seed-db.js"
+    "test": "jest"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "mongoose": "^8.0.0",
+    "mongoose": "^7.6.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "qrcode": "^1.5.3",
     "body-parser": "^1.20.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
-  }
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
+  },
+  "keywords": [
+    "api",
+    "navigation",
+    "pathfinding"
+  ],
+  "author": "",
+  "license": "MIT"
 }
 

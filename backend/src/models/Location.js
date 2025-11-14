@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const locationSchema = new mongoose.Schema({
-  locationId: {
+  id: {
     type: String,
     required: true,
     unique: true,
@@ -11,33 +11,45 @@ const locationSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  coordinates: {
-    x: { type: Number, required: true },
-    y: { type: Number, required: true },
-    z: { type: Number, default: 0 }, // For 3D navigation
-  },
-  qrCodeId: {
-    type: String,
+  x: {
+    type: Number,
     required: true,
-    unique: true,
   },
-  description: {
-    type: String,
-    default: '',
+  y: {
+    type: Number,
+    required: true,
   },
   floor: {
     type: Number,
-    default: 0,
+    default: 1,
   },
-  connections: [{
-    locationId: String,
-    distance: Number,
-  }],
-  createdAt: {
-    type: Date,
-    default: Date.now,
+  category: {
+    type: String,
+    enum: ['Academic', 'Food', 'Parking', 'Events', 'Administrative', 'Other'],
+    default: 'Other',
   },
+  icon: {
+    type: String,
+    default: '📍',
+  },
+  isDestination: {
+    type: Boolean,
+    default: true,
+  },
+  connections: [
+    {
+      type: String,
+      ref: 'Location',
+    },
+  ],
+}, {
+  timestamps: true,
 });
 
-module.exports = mongoose.model('Location', locationSchema);
+// Index for faster queries
+locationSchema.index({ x: 1, y: 1 });
+
+const Location = mongoose.model('Location', locationSchema);
+
+module.exports = Location;
 

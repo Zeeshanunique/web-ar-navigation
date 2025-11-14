@@ -1,71 +1,74 @@
 const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
-const mongoose = require('mongoose');
-require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
 
-const Location = require('../backend/src/models/Location');
+// Sample location data for QR codes
+const locations = [
+  { id: 'parking_01', name: 'Parking Lot' },
+  { id: 'cafeteria', name: 'Cafeteria' },
+  { id: 'library', name: 'Library' },
+  { id: 'classroom_a', name: 'Classroom Block A' },
+  { id: 'lab', name: 'Laboratory' },
+  { id: 'auditorium', name: 'Auditorium' },
+];
 
-// Connect to MongoDB
-const connectDB = async () => {
+// Create output directory
+const outputDir = path.join(__dirname, '../qr-codes');
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true });
+}
+
+async function generateQRCode(location) {
   try {
-    await mongoose.connect(
-      process.env.MONGODB_URI || 'mongodb://localhost:27017/web-ar-navigation',
-      { useNewUrlParser: true, useUnifiedTopology: true }
-    );
-    console.log('Connected to MongoDB');
+    // QR code data format: JSON string with locationId
+    const qrData = JSON.stringify({ locationId: location.id });
+    
+    // Generate QR code
+    const qrPath = path.join(outputDir, `${location.id}.png`);
+    await QRCode.toFile(qrPath, qrData, {
+      errorCorrectionLevel: 'H',
+      type: 'png',
+      width: 300,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+    });
+    
+    console.log(`✅ Generated QR code for ${location.name}: ${qrPath}`);
+    
+    // Also generate a text file with the data
+    const txtPath = path.join(outputDir, `${location.id}.txt`);
+    fs.writeFileSync(txtPath, qrData);
+    
+    return qrPath;
   } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
+    console.error(`❌ Error generating QR for ${location.name}:`, error);
+    return null;
   }
-};
+}
 
-// Generate QR codes for all locations
-const generateQRCodes = async () => {
-  try {
-    await connectDB();
-
-    const locations = await Location.find({});
-    console.log(`Found ${locations.length} locations`);
-
-    // Ensure output directory exists
-    const outputDir = path.join(__dirname, '../frontend/public/qr_codes');
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    // Generate QR code for each location
-    for (const location of locations) {
-      const qrData = JSON.stringify({
-        locationId: location.locationId,
-        timestamp: Date.now(),
-      });
-
-      const outputPath = path.join(outputDir, `${location.locationId}.png`);
-
-      await QRCode.toFile(outputPath, qrData, {
-        errorCorrectionLevel: 'M',
-        type: 'png',
-        width: 256,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF',
-        },
-      });
-
-      console.log(`✓ Generated QR code for ${location.name} (${location.locationId})`);
-    }
-
-    console.log(`\n✅ Generated ${locations.length} QR codes in ${outputDir}`);
-    await mongoose.connection.close();
-    process.exit(0);
-  } catch (error) {
-    console.error('Error generating QR codes:', error);
-    await mongoose.connection.close();
-    process.exit(1);
+async function generateAllQRCodes() {
+  console.log('🚀 Generating QR codes...\n');
+  
+  for (const location of locations) {
+    await generateQRCode(location);
   }
-};
+  
+  console.log(`\n🎉 Generated ${locations.length} QR codes in ${outputDir}`);
+  console.log('\n📝 QR Code Data Format:');
+  console.log('   { "locationId": "location_id" }');
+}
 
-generateQRCodes();
+// Check if qrcode package is installed
+try {
+  require('qrcode');
+  generateAllQRCodes();
+} catch (error) {
+  console.error('❌ QRCode package not found. Installing...');
+  console.log('\n💡 To generate QR codes, run:');
+  console.log('   npm install qrcode');
+  console.log('   Then run: npm run generate:qr');
+}
 

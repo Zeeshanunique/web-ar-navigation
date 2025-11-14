@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { calculateRoute } = require('../controllers/routeController');
+const routeController = require('../controllers/routeController');
 
-router.post('/', calculateRoute);
+// POST /api/route - Calculate route between two locations
+router.post('/route', routeController.calculateRoute);
 
 module.exports = router;
 

@@ -1,165 +1,248 @@
-# Architecture Overview
+# System Architecture
 
-## System Architecture
+## Overview
 
-```
-┌─────────────────┐
-│   Web Browser   │
-│  (Next.js App)  │
-└────────┬────────┘
-         │
-         │ HTTP/REST API
-         │
-┌────────▼────────┐
-│  Express.js     │
-│   Backend       │
-└────────┬────────┘
-         │
-         │ MongoDB Driver
-         │
-┌────────▼────────┐
-│    MongoDB      │
-│   Database      │
-└─────────────────┘
-```
+The AR Navigation System is built with a **client-server architecture**:
 
-## Component Architecture
+- **Mobile App (React Native)**: Frontend application for users
+- **Backend API (Node.js/Express)**: Server for route calculation and data management
+- **Database (MongoDB)**: Stores location graph and campus data
 
-### Frontend (Next.js)
+## Architecture Diagram
 
 ```
-Pages
-├── index.js          # Homepage (QR scan + destination selection)
-└── navigation.js     # AR Navigation view
-
-Components
-├── CameraFeed.js     # WebRTC camera stream
-├── QRScanner.js      # QR code detection using jsQR
-├── AROverlay.js      # AR arrows and directions
-├── DestinationSelector.js  # Location dropdown
-└── RouteInfoCard.js  # Route details display
-
-Hooks
-└── useARNavigator.js # AR navigation logic & device orientation
-
-Utils
-├── apiClient.js      # Axios HTTP client
-└── routeUtils.js    # Route calculation helpers
+┌─────────────────────────────────────────────────────────┐
+│                    Mobile App (React Native)            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐             │
+│  │   QR     │  │   AR     │  │  Route   │             │
+│  │ Scanner  │→ │ Overlay  │← │ Display  │             │
+│  └──────────┘  └──────────┘  └──────────┘             │
+│       │              │              │                  │
+│       └──────────────┼──────────────┘                  │
+│                      │                                 │
+│              ┌───────▼────────┐                        │
+│              │  API Service   │                        │
+│              └───────┬────────┘                        │
+└──────────────────────┼──────────────────────────────────┘
+                       │ HTTP/REST
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│              Backend API (Express)                      │
+│  ┌──────────────┐  ┌──────────────┐                    │
+│  │  Location    │  │   Route      │                    │
+│  │  Controller  │  │  Controller  │                    │
+│  └──────┬───────┘  └──────┬───────┘                    │
+│         │                 │                            │
+│         └────────┬────────┘                            │
+│                  │                                      │
+│         ┌────────▼────────┐                            │
+│         │  A* Algorithm   │                            │
+│         └────────┬────────┘                            │
+│                  │                                      │
+│         ┌────────▼────────┐                            │
+│         │  Location Model │                            │
+│         └────────┬────────┘                            │
+└──────────────────┼──────────────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────────────┐
+│              MongoDB Database                            │
+│  ┌──────────────────────────────────────┐              │
+│  │         Locations Collection          │              │
+│  │  - id, name, x, y, connections       │              │
+│  └──────────────────────────────────────┘              │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### Backend (Express.js)
+## Component Breakdown
 
-```
-Routes
-├── locationRouter.js  # Location CRUD endpoints
-└── routeRouter.js     # Route calculation endpoint
+### Mobile App Components
 
-Controllers
-├── locationController.js  # Location business logic
-└── routeController.js     # Route calculation logic
+#### 1. **Screens**
+- `HomeScreen`: Main entry point with navigation options
+- `QRScannerScreen`: Camera view for scanning QR codes
+- `DestinationScreen`: List of available destinations
+- `ARNavigationScreen`: AR overlay with directional arrows
 
-Models
-└── Location.js       # MongoDB schema
+#### 2. **Components**
+- `ARArrow`: SVG arrow component that rotates based on device orientation
 
-Utils
-├── aStarAlgorithm.js # A* pathfinding implementation
-└── qrGenerator.js    # QR code generation
+#### 3. **Services**
+- `apiService`: Handles all API communication with backend
+  - `getLocationById()`: Fetch location data from QR code
+  - `getDestinations()`: Get list of available destinations
+  - `calculateRoute()`: Request route calculation from backend
 
-Config
-├── db.js            # MongoDB connection
-└── env.js           # Environment variables
-```
+#### 4. **Utils**
+- `aStarAlgorithm.js`: Client-side A* implementation (for offline mode)
+- `navigationUtils.js`: Helper functions for bearing calculation, distance, etc.
+
+### Backend Components
+
+#### 1. **Controllers**
+- `locationController.js`: Handles location-related requests
+  - `getLocationById()`: Get location by ID
+  - `getDestinations()`: Get all destinations
+  - `getAllLocations()`: Get all locations
+  - `createLocation()`: Create new location
+
+- `routeController.js`: Handles route calculation
+  - `calculateRoute()`: Calculate shortest path using A*
+
+#### 2. **Models**
+- `Location.js`: MongoDB schema for locations
+  - Fields: id, name, x, y, floor, category, icon, connections
+
+#### 3. **Utils**
+- `aStarAlgorithm.js`: Server-side A* pathfinding implementation
+
+#### 4. **Routes**
+- `locationRouter.js`: Routes for location endpoints
+- `routeRouter.js`: Routes for route calculation
 
 ## Data Flow
 
 ### 1. QR Code Scanning Flow
 
 ```
-User scans QR → QRScanner detects code → 
-Extract locationId → API call to /api/locations/qr/:qrId → 
-Backend queries MongoDB → Returns location data → 
-Frontend sets source location
+User scans QR → QRScannerScreen detects code
+    ↓
+Extract locationId from QR data
+    ↓
+API call: GET /api/location/:id
+    ↓
+Backend queries MongoDB
+    ↓
+Return location data (x, y coordinates)
+    ↓
+Navigate to DestinationScreen with current location
 ```
 
 ### 2. Route Calculation Flow
 
 ```
-User selects destination → Frontend calls /api/route → 
-Backend fetches all locations → A* algorithm calculates path → 
-Returns path with directions → Frontend displays route
+User selects destination
+    ↓
+API call: POST /api/route { source, destination }
+    ↓
+Backend fetches all locations from MongoDB
+    ↓
+Build graph from locations and connections
+    ↓
+Run A* algorithm to find shortest path
+    ↓
+Return path array: [{x, y}, {x, y}, ...]
+    ↓
+Navigate to ARNavigationScreen with path
 ```
 
 ### 3. AR Navigation Flow
 
 ```
-Camera feed active → Device orientation API → 
-useARNavigator hook calculates arrow angle → 
-AROverlay renders arrow → Updates in real-time
+ARNavigationScreen displays camera feed
+    ↓
+Calculate bearing from current waypoint to next
+    ↓
+Get device heading from accelerometer/compass
+    ↓
+Calculate angle difference (bearing - heading)
+    ↓
+Render ARArrow rotated by angle difference
+    ↓
+User follows arrow direction
+    ↓
+(Optional) Scan another QR to recalibrate position
 ```
 
-## Technologies
+## Graph Structure
 
-### Frontend Stack
-- **Next.js 14**: React framework with SSR
-- **React 18**: UI library
-- **jsQR**: QR code detection
-- **WebRTC**: Camera access
-- **DeviceOrientation API**: Device sensors
+The campus is represented as a **graph** where:
 
-### Backend Stack
-- **Express.js**: Web framework
-- **MongoDB**: Database
-- **Mongoose**: ODM
-- **qrcode**: QR code generation
-- **A* Algorithm**: Pathfinding
+- **Nodes**: Locations (parking, library, cafeteria, etc.)
+- **Edges**: Walkable paths between locations
+- **Weights**: Euclidean distance between connected nodes
 
-## Key Algorithms
+### Example Graph
 
-### A* Pathfinding
+```
+parking_01 (10, 5)
+    │
+    ├──→ junction_1 (11, 7)
+    │       │
+    │       ├──→ cafeteria (12, 10)
+    │       │       │
+    │       │       ├──→ library (16, 14)
+    │       │       │
+    │       │       └──→ classroom_a (8, 12)
+    │       │
+    │       └──→ ...
+```
 
-The A* algorithm finds the shortest path between two locations:
+## A* Algorithm
 
-1. **Heuristic Function**: Euclidean distance between points
-2. **Open Set**: Locations to be evaluated
-3. **Closed Set**: Locations already evaluated
-4. **Cost Function**: `f(n) = g(n) + h(n)`
-   - `g(n)`: Actual cost from start to node
-   - `h(n)`: Estimated cost from node to goal
+The A* algorithm finds the shortest path by:
 
-### AR Direction Calculation
+1. **Starting Node**: Current location (from QR scan)
+2. **Goal Node**: Selected destination
+3. **Heuristic**: Euclidean distance (h)
+4. **Cost Function**: g(n) = cost from start to node n
+5. **Total Cost**: f(n) = g(n) + h(n)
 
-1. Calculate bearing from current position to next waypoint
-2. Get device compass heading (DeviceOrientation API)
-3. Calculate relative angle: `bearing - heading`
-4. Rotate arrow by relative angle
+### Algorithm Steps
+
+```
+1. Initialize open set with start node
+2. While open set is not empty:
+   a. Select node with lowest f score
+   b. If node is goal, reconstruct path
+   c. Move node to closed set
+   d. For each neighbor:
+      - Calculate g and h
+      - Add to open set if not already evaluated
+3. Return path or null if no path found
+```
+
+## API Endpoints
+
+### Location Endpoints
+
+- `GET /api/location/:id` - Get location by ID
+- `GET /api/location/destinations` - Get all destinations
+- `GET /api/location` - Get all locations
+- `POST /api/location` - Create new location
+
+### Route Endpoints
+
+- `POST /api/route` - Calculate route
+  - Request: `{ source: "parking_01", destination: "library" }`
+  - Response: `{ path: [{x, y}, ...], distance: 10.5, steps: 4 }`
+
+## Offline Mode
+
+The mobile app includes **fallback data** for offline operation:
+
+- Predefined locations in `apiService.js`
+- Simple straight-line path calculation
+- Limited functionality but still usable
 
 ## Security Considerations
 
-- **CORS**: Configured for specific frontend URL
-- **Input Validation**: Validate location IDs and coordinates
-- **Error Handling**: Graceful error responses
-- **Camera Permissions**: User must grant camera access
-- **HTTPS**: Required for camera access in production
+1. **Input Validation**: All API inputs are validated
+2. **Error Handling**: Comprehensive error handling at all levels
+3. **CORS**: Configured for development (adjust for production)
+4. **Environment Variables**: Sensitive data stored in `.env`
 
 ## Scalability
 
-### Current Limitations
-- Single MongoDB instance
-- No caching layer
-- No load balancing
+- **Database Indexing**: Locations indexed by id, x, y
+- **Graph Caching**: Consider caching graph structure
+- **API Rate Limiting**: Add rate limiting for production
+- **CDN**: Serve static assets via CDN
 
-### Future Enhancements
-- Redis caching for routes
-- MongoDB replica set
-- CDN for static assets
-- WebSocket for real-time updates
-- Indoor positioning system (IPS) integration
+## Future Enhancements
 
-## Performance Optimizations
-
-1. **Route Caching**: Cache frequently used routes
-2. **Lazy Loading**: Load components on demand
-3. **Image Optimization**: Optimize QR code images
-4. **Database Indexing**: Index on `locationId` and `qrCodeId`
-5. **API Rate Limiting**: Prevent abuse
+1. **Multi-floor Support**: Add floor detection and vertical navigation
+2. **Real-time Updates**: WebSocket for live position updates
+3. **User Tracking**: Track user position using step counting
+4. **Crowd Data**: Integrate real-time traffic information
+5. **3D AR**: Upgrade to full 3D AR mapping
 

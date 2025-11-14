@@ -58,7 +58,7 @@ const reconstructPath = (node) => {
  * @param {string} goalId - Goal node ID
  * @returns {Array|null} Path array or null if no path found
  */
-const aStar = (graph, startId, goalId) => {
+export const aStar = (graph, startId, goalId) => {
   if (!graph || !graph.nodes || !graph.edges) {
     throw new Error('Invalid graph structure');
   }
@@ -153,7 +153,7 @@ const aStar = (graph, startId, goalId) => {
  * @param {Array} connections - Array of connection objects
  * @returns {Object} Graph object with nodes and edges
  */
-const createGraph = (locations, connections) => {
+export const createGraph = (locations, connections) => {
   const nodes = {};
   const edges = [];
 
@@ -186,7 +186,7 @@ const createGraph = (locations, connections) => {
   return { nodes, edges };
 };
 
-module.exports = {
+export default {
   aStar,
   createGraph,
 };

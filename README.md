@@ -1,160 +1,165 @@
-# 🧭 Web-Based AR Navigation System
+# AR-Based Indoor Navigation System
 
-A complete WebAR navigation system using QR codes and camera-based AR overlays for indoor/outdoor navigation.
+A React Native mobile application that provides indoor navigation for college campuses using Augmented Reality (AR) and QR code-based positioning.
 
-## 🚀 Features
+## 🎯 Features
 
-- **QR Code Scanning**: Scan QR codes to set your starting location
-- **AR Navigation**: Real-time AR overlays with directional arrows
-- **A* Pathfinding**: Intelligent shortest path calculation
-- **WebRTC Camera**: Direct camera access via WebRTC
-- **Device Orientation**: Uses device sensors for accurate AR positioning
-- **Responsive Design**: Works on mobile and desktop browsers
+- **QR Code Scanning**: Scan QR codes at starting locations to determine exact indoor position
+- **A* Pathfinding**: Calculates shortest route using A* algorithm
+- **AR Navigation**: Real-time AR directional arrows overlaid on camera feed
+- **Destination Selection**: Easy-to-use interface for selecting campus locations
+- **Offline Support**: Works offline after initial data sync
+
+## 📱 Technology Stack
+
+### Mobile App (React Native)
+- React Native CLI
+- `react-native-vision-camera` - Camera access
+- `vision-camera-code-scanner` - QR code scanning
+- `react-native-sensors` - Device orientation/compass
+- `react-native-reanimated` - Smooth AR overlays
+- React Navigation - App routing
+
+### Backend
+- Node.js + Express
+- MongoDB - Location graph storage
+- RESTful API for route calculation
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js (v16 or higher)
+- React Native CLI
+- Android Studio (for Android development)
+- Xcode (for iOS development, macOS only)
+- MongoDB (local or cloud instance)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd web-ar-navigation
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm run install:all
+   ```
+
+3. **Set up environment variables**
+
+   Create `backend/.env`:
+   ```env
+   PORT=3000
+   MONGODB_URI=mongodb://localhost:27017/ar-navigation
+   NODE_ENV=development
+   ```
+
+4. **Start MongoDB**
+   ```bash
+   mongod
+   ```
+
+5. **Seed the database**
+   ```bash
+   npm run seed:db
+   ```
+
+6. **Start the backend server**
+   ```bash
+   npm run start:backend
+   ```
+
+7. **Start the mobile app**
+   ```bash
+   cd mobile
+   npm start
+   ```
+
+   Then press `a` for Android or `i` for iOS.
 
 ## 📁 Project Structure
 
 ```
 web-ar-navigation/
-├── frontend/          # Next.js WebAR Frontend
-├── backend/           # Express.js Backend
-├── docs/              # Documentation
-└── scripts/           # Utility scripts
+├── mobile/                 # React Native app
+│   ├── src/
+│   │   ├── components/     # Reusable components
+│   │   ├── screens/        # App screens
+│   │   ├── navigation/     # Navigation setup
+│   │   ├── services/       # API services
+│   │   ├── utils/          # Utilities (A* algorithm, etc.)
+│   │   └── hooks/          # Custom React hooks
+│   ├── App.js
+│   └── package.json
+├── backend/                # Node.js backend
+│   ├── src/
+│   │   ├── controllers/    # Route controllers
+│   │   ├── models/         # MongoDB models
+│   │   ├── routes/         # API routes
+│   │   ├── utils/          # Utilities (A* algorithm)
+│   │   └── index.js        # Server entry point
+│   └── package.json
+├── scripts/                # Utility scripts
+│   ├── generate-qr.js      # QR code generator
+│   └── seed-db.js          # Database seeding
+└── README.md
 ```
 
-## 🛠️ Tech Stack
+## 🎮 Usage
 
-- **Frontend**: Next.js, React, Three.js, AR.js
-- **Backend**: Node.js, Express.js
-- **Database**: MongoDB
-- **QR Detection**: jsQR
-- **AR**: WebRTC + DeviceOrientation API
+1. **Open the app** and grant camera permissions
+2. **Scan a QR code** at your starting location (e.g., Parking)
+3. **Select your destination** from the list (e.g., Library)
+4. **Follow the AR arrows** overlaid on your camera feed
+5. **Scan another QR code** if you need to recalibrate your position
 
-## 📦 Installation
+## 🧪 Testing
 
-### Prerequisites
-
-- Node.js 18+ and npm
-- MongoDB (local or cloud instance)
-
-### Setup
-
-1. **Clone and navigate to the project:**
-   ```bash
-   cd web-ar-navigation
-   ```
-
-2. **Install frontend dependencies:**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-3. **Install backend dependencies:**
-   ```bash
-   cd ../backend
-   npm install
-   ```
-
-4. **Configure environment variables:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your MongoDB URI and other settings
-   ```
-
-5. **Seed the database with sample locations:**
-   ```bash
-   npm run seed
-   ```
-
-6. **Generate QR codes for locations:**
-   ```bash
-   cd ../scripts
-   node generate-qr.js
-   ```
-
-## 🚀 Running the Application
-
-### Development Mode
-
-1. **Start the backend server:**
-   ```bash
-   cd backend
-   npm run dev
-   ```
-   Backend runs on `http://localhost:5000`
-
-2. **Start the frontend (in a new terminal):**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-   Frontend runs on `http://localhost:3000`
-
-### Production Build
-
+### Unit Tests
 ```bash
-# Frontend
-cd frontend
-npm run build
-npm start
-
-# Backend
-cd backend
-npm start
+cd mobile && npm test
+cd backend && npm test
 ```
 
-## 📱 Usage Flow
+### Integration Testing
+- Test QR scanning → navigation flow
+- Verify A* pathfinding accuracy
+- Test AR overlay responsiveness
 
-1. Open the web app in a browser (preferably mobile for AR features)
-2. Grant camera permissions when prompted
-3. Scan a QR code at your starting location
-4. Select a destination from the dropdown
-5. Follow the AR arrows to navigate
-6. Scan the destination QR code to complete navigation
+## 📊 API Endpoints
 
-## 🔧 Configuration
+### `GET /api/location/:id`
+Get location coordinates by QR code ID
 
-### Backend Environment Variables
-
-- `PORT`: Server port (default: 5000)
-- `MONGODB_URI`: MongoDB connection string
-- `FRONTEND_URL`: Frontend URL for CORS
-- `QR_CODE_SIZE`: Size of generated QR codes
-
-### Frontend Configuration
-
-Update `frontend/utils/apiClient.js` with your backend URL if different from default.
-
-## 📚 API Endpoints
-
-### GET `/api/locations`
-Get all available locations
-
-### GET `/api/locations/:qrId`
-Get location details by QR code ID
-
-### POST `/api/route`
-Calculate route between two locations
+### `POST /api/route`
+Calculate shortest path between two locations
 ```json
 {
-  "source": "parking",
+  "source": "parking_01",
   "destination": "library"
 }
 ```
 
-## 🧪 Testing
+## 🛠️ Development
 
-1. Ensure MongoDB is running
-2. Seed the database: `cd backend && npm run seed`
-3. Generate QR codes: `cd scripts && node generate-qr.js`
-4. Start both servers
-5. Open `http://localhost:3000` in a mobile browser
+### Generate QR Codes
+```bash
+npm run generate:qr
+```
+
+### Database Seeding
+```bash
+npm run seed:db
+```
 
 ## 📝 License
 
 MIT
 
-## 🤝 Contributing
+## 👥 Contributors
 
-Contributions welcome! Please open an issue or submit a PR.
+University Project - AR Navigation System
 

@@ -1,29 +1,49 @@
 # Dependencies
 node_modules/
-/.pnp
-.pnp.js
+*/node_modules/
 
-# Testing
-/coverage
+# React Native
+mobile/.expo/
+mobile/.expo-shared/
+mobile/dist/
+mobile/npm-debug.*
+mobile/.yarn-integrity
+mobile/.env.local
+mobile/.env.development.local
+mobile/.env.test.local
+mobile/.env.production.local
 
-# Next.js
-/.next/
-/out/
-/build
-/dist
+# iOS
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/*.xcworkspace
+mobile/ios/*.xcuserdata
+mobile/ios/.xcode.env.local
 
-# Production
+# Android
+mobile/android/.gradle
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/.idea
+mobile/android/local.properties
+mobile/android/*.iml
+mobile/android/.cxx/
+
+# Backend
+backend/node_modules/
+backend/.env
+backend/dist/
+backend/logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# Database
+*.db
+*.sqlite
 
 # Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
 # IDE
 .vscode/
@@ -36,18 +56,18 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Backend
-backend/uploads/
-backend/temp/
+# Build outputs
+build/
+dist/
+*.apk
+*.ipa
 
-# Frontend
-frontend/.next/
-frontend/out/
+# QR Code outputs
+qr-codes/
+*.png
+*.jpg
 
-# Database
-*.db
-*.sqlite
-
-# Generated QR codes (optional - uncomment if you don't want to track generated QR codes)
-# frontend/public/qr_codes/*.png
+# Testing
+coverage/
+.nyc_output/
 

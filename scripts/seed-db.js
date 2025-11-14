@@ -1,150 +1,146 @@
-const mongoose = require('mongoose');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
 
-const Location = require('../backend/src/models/Location');
+// Resolve backend directory path
+const backendPath = path.join(__dirname, '../backend');
 
-// Connect to MongoDB
-const connectDB = async () => {
+// Add backend node_modules to module path
+const Module = require('module');
+const originalRequire = Module.prototype.require;
+Module.prototype.require = function(id) {
   try {
-    await mongoose.connect(
-      process.env.MONGODB_URI || 'mongodb://localhost:27017/web-ar-navigation',
-      { useNewUrlParser: true, useUnifiedTopology: true }
-    );
-    console.log('Connected to MongoDB');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
+    return originalRequire.apply(this, arguments);
+  } catch (e) {
+    if (e.code === 'MODULE_NOT_FOUND') {
+      try {
+        return originalRequire.call(this, path.join(backendPath, 'node_modules', id));
+      } catch (e2) {
+        throw e;
+      }
+    }
+    throw e;
   }
 };
 
-// Sample locations data (campus example)
+const mongoose = require('mongoose');
+const Location = require(path.join(backendPath, 'src/models/Location'));
+require('dotenv').config({ path: path.join(backendPath, '.env') });
+
+// Sample campus locations
 const sampleLocations = [
   {
-    locationId: 'parking',
-    name: 'Parking Area',
-    coordinates: { x: 0, y: 0, z: 0 },
-    qrCodeId: 'parking-qr',
-    description: 'Main parking area',
-    floor: 0,
-    connections: [
-      { locationId: 'entrance', distance: 50 },
-      { locationId: 'cafeteria', distance: 100 },
-    ],
+    id: 'parking_01',
+    name: 'Parking Lot',
+    x: 10,
+    y: 5,
+    category: 'Parking',
+    icon: '🅿️',
+    isDestination: true,
+    connections: ['cafeteria', 'classroom_a'],
   },
   {
-    locationId: 'entrance',
-    name: 'Main Entrance',
-    coordinates: { x: 50, y: 0, z: 0 },
-    qrCodeId: 'entrance-qr',
-    description: 'Main building entrance',
-    floor: 0,
-    connections: [
-      { locationId: 'parking', distance: 50 },
-      { locationId: 'lobby', distance: 30 },
-      { locationId: 'cafeteria', distance: 80 },
-    ],
-  },
-  {
-    locationId: 'lobby',
-    name: 'Lobby',
-    coordinates: { x: 80, y: 0, z: 0 },
-    qrCodeId: 'lobby-qr',
-    description: 'Main lobby area',
-    floor: 0,
-    connections: [
-      { locationId: 'entrance', distance: 30 },
-      { locationId: 'library', distance: 60 },
-      { locationId: 'elevator', distance: 40 },
-    ],
-  },
-  {
-    locationId: 'library',
-    name: 'Library',
-    coordinates: { x: 140, y: 0, z: 0 },
-    qrCodeId: 'library-qr',
-    description: 'Main library',
-    floor: 0,
-    connections: [
-      { locationId: 'lobby', distance: 60 },
-      { locationId: 'classroom-a', distance: 50 },
-    ],
-  },
-  {
-    locationId: 'cafeteria',
+    id: 'cafeteria',
     name: 'Cafeteria',
-    coordinates: { x: 50, y: 100, z: 0 },
-    qrCodeId: 'cafeteria-qr',
-    description: 'Cafeteria and dining area',
-    floor: 0,
-    connections: [
-      { locationId: 'parking', distance: 100 },
-      { locationId: 'entrance', distance: 80 },
-      { locationId: 'gym', distance: 70 },
-    ],
+    x: 12,
+    y: 10,
+    category: 'Food',
+    icon: '🍽️',
+    isDestination: true,
+    connections: ['parking_01', 'library', 'classroom_a'],
   },
   {
-    locationId: 'gym',
-    name: 'Gymnasium',
-    coordinates: { x: 50, y: 170, z: 0 },
-    qrCodeId: 'gym-qr',
-    description: 'Sports and fitness center',
-    floor: 0,
-    connections: [
-      { locationId: 'cafeteria', distance: 70 },
-    ],
+    id: 'library',
+    name: 'Library',
+    x: 16,
+    y: 14,
+    category: 'Academic',
+    icon: '📚',
+    isDestination: true,
+    connections: ['cafeteria', 'classroom_a', 'lab'],
   },
   {
-    locationId: 'elevator',
-    name: 'Elevator',
-    coordinates: { x: 120, y: 0, z: 0 },
-    qrCodeId: 'elevator-qr',
-    description: 'Main elevator',
-    floor: 0,
-    connections: [
-      { locationId: 'lobby', distance: 40 },
-      { locationId: 'classroom-a', distance: 30 },
-    ],
+    id: 'classroom_a',
+    name: 'Classroom Block A',
+    x: 8,
+    y: 12,
+    category: 'Academic',
+    icon: '🏫',
+    isDestination: true,
+    connections: ['parking_01', 'cafeteria', 'library', 'auditorium'],
   },
   {
-    locationId: 'classroom-a',
-    name: 'Classroom A',
-    coordinates: { x: 150, y: 0, z: 0 },
-    qrCodeId: 'classroom-a-qr',
-    description: 'Classroom A',
-    floor: 0,
-    connections: [
-      { locationId: 'library', distance: 50 },
-      { locationId: 'elevator', distance: 30 },
-    ],
+    id: 'lab',
+    name: 'Laboratory',
+    x: 14,
+    y: 8,
+    category: 'Academic',
+    icon: '🔬',
+    isDestination: true,
+    connections: ['library', 'auditorium'],
+  },
+  {
+    id: 'auditorium',
+    name: 'Auditorium',
+    x: 18,
+    y: 6,
+    category: 'Events',
+    icon: '🎭',
+    isDestination: true,
+    connections: ['classroom_a', 'lab'],
+  },
+  // Additional waypoints
+  {
+    id: 'junction_1',
+    name: 'Junction 1',
+    x: 11,
+    y: 7,
+    category: 'Other',
+    icon: '📍',
+    isDestination: false,
+    connections: ['parking_01', 'cafeteria'],
+  },
+  {
+    id: 'junction_2',
+    name: 'Junction 2',
+    x: 13,
+    y: 11,
+    category: 'Other',
+    icon: '📍',
+    isDestination: false,
+    connections: ['cafeteria', 'library'],
   },
 ];
 
-// Seed database
-const seedDatabase = async () => {
+async function seedDatabase() {
   try {
-    await connectDB();
-
+    // Connect to MongoDB
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ar-navigation';
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    
+    console.log('✅ Connected to MongoDB');
+    
     // Clear existing locations
     await Location.deleteMany({});
-    console.log('Cleared existing locations');
-
+    console.log('🗑️  Cleared existing locations');
+    
     // Insert sample locations
-    const inserted = await Location.insertMany(sampleLocations);
-    console.log(`\n✅ Seeded ${inserted.length} locations:`);
-    inserted.forEach((loc) => {
-      console.log(`  - ${loc.name} (${loc.locationId})`);
-    });
-
-    await mongoose.connection.close();
-    console.log('\n✅ Database seeding completed!');
+    for (const locationData of sampleLocations) {
+      const location = new Location(locationData);
+      await location.save();
+      console.log(`✅ Created location: ${locationData.name} (${locationData.id})`);
+    }
+    
+    console.log('\n🎉 Database seeded successfully!');
+    console.log(`📊 Total locations: ${sampleLocations.length}`);
+    
     process.exit(0);
   } catch (error) {
-    console.error('Error seeding database:', error);
-    await mongoose.connection.close();
+    console.error('❌ Error seeding database:', error);
     process.exit(1);
   }
-};
+}
 
 seedDatabase();
 

@@ -1,0 +1,26 @@
+{
+  "name": "ar-navigation-system",
+  "version": "1.0.0",
+  "description": "AR-Based Indoor Navigation System for College Campus",
+  "main": "index.js",
+  "scripts": {
+    "install:all": "cd mobile && npm install && cd ../backend && npm install",
+    "start:mobile": "cd mobile && npm start",
+    "start:backend": "cd backend && npm run dev",
+    "generate:qr": "node scripts/generate-qr.js",
+    "seed:db": "node scripts/seed-db.js"
+  },
+  "devDependencies": {
+    "qrcode": "^1.5.3"
+  },
+  "keywords": [
+    "react-native",
+    "ar",
+    "navigation",
+    "qr-code",
+    "indoor-navigation"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
