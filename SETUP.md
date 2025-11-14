@@ -50,7 +50,7 @@ Create a new file named `.env` with the following content:
 
 ```env
 PORT=3000
-MONGODB_URI=mongodb://localhost:27017/ar-navigation
+MONGODB_URI=
 NODE_ENV=development
 ```
 

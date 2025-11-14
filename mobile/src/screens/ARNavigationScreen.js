@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Accelerometer } from 'expo-sensors';
 import ARArrow from '../components/ARArrow';
 import { calculateBearing } from '../utils/navigationUtils';
@@ -129,7 +129,7 @@ export default function ARNavigationScreen({ navigation, route: navRoute }) {
     <View style={styles.container}>
       <CameraView
         style={StyleSheet.absoluteFill}
-        facing={CameraType.back}
+        facing="back"
       />
 
       {/* AR Overlay */}

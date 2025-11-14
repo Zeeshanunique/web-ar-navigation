@@ -23,7 +23,7 @@ cd backend
 Create a `.env` file with:
 ```env
 PORT=3000
-MONGODB_URI=mongodb://localhost:27017/ar-navigation
+MONGODB_URI=
 NODE_ENV=development
 ```
 

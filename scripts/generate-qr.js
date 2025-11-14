@@ -1,6 +1,28 @@
+const path = require('path');
+
+// Resolve backend directory path
+const backendPath = path.join(__dirname, '../backend');
+
+// Add backend node_modules to module path
+const Module = require('module');
+const originalRequire = Module.prototype.require;
+Module.prototype.require = function(id) {
+  try {
+    return originalRequire.apply(this, arguments);
+  } catch (e) {
+    if (e.code === 'MODULE_NOT_FOUND') {
+      try {
+        return originalRequire.call(this, path.join(backendPath, 'node_modules', id));
+      } catch (e2) {
+        throw e;
+      }
+    }
+    throw e;
+  }
+};
+
 const QRCode = require('qrcode');
 const fs = require('fs');
-const path = require('path');
 
 // Sample location data for QR codes
 const locations = [

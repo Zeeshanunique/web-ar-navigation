@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen({ navigation }) {
   const handleScanQR = () => {
@@ -24,7 +24,7 @@ export default function HomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>AR Navigation</Text>
+        <Text style={styles.title}>AR Navigation </Text>
         <Text style={styles.subtitle}>
           Navigate your campus with AR-powered directions
         </Text>

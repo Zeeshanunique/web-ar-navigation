@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { getLocationById } from '../services/apiService';
 
 export default function QRScannerScreen({ navigation, route }) {
@@ -99,7 +99,7 @@ export default function QRScannerScreen({ navigation, route }) {
     <View style={styles.container}>
       <CameraView
         style={StyleSheet.absoluteFill}
-        facing={CameraType.back}
+        facing="back"
         onBarcodeScanned={isScanning && !loading ? handleBarCodeScanned : undefined}
         barcodeScannerSettings={{
           barcodeTypes: ['qr'],

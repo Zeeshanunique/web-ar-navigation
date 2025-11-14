@@ -53,7 +53,7 @@ A React Native mobile application that provides indoor navigation for college ca
    Create `backend/.env`:
    ```env
    PORT=3000
-   MONGODB_URI=mongodb://localhost:27017/ar-navigation
+   MONGODB_URI=
    NODE_ENV=development
    ```
 
