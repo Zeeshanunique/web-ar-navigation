@@ -8,22 +8,24 @@ A React Native mobile application that provides indoor navigation for college ca
 - **A* Pathfinding**: Calculates shortest route using A* algorithm
 - **AR Navigation**: Real-time AR directional arrows overlaid on camera feed
 - **Destination Selection**: Easy-to-use interface for selecting campus locations
-- **Offline Support**: Works offline after initial data sync
+- **Offline Support**: Complete offline functionality with local AsyncStorage database
+- **Enhanced AR Experience**: Large, stable AR arrows with sensor smoothing
 
 ## 📱 Technology Stack
 
-### Mobile App (React Native)
-- React Native CLI
-- `react-native-vision-camera` - Camera access
-- `vision-camera-code-scanner` - QR code scanning
-- `react-native-sensors` - Device orientation/compass
+### Mobile App (React Native/Expo)
+- Expo SDK ~54.0.0
+- React Native 0.81.5 with TypeScript
+- `expo-camera` - Camera access and QR code scanning
+- `expo-sensors` - Device orientation/compass/magnetometer
+- `@react-native-async-storage/async-storage` - Local data storage
 - `react-native-reanimated` - Smooth AR overlays
 - React Navigation - App routing
 
-### Backend
-- Node.js + Express
-- MongoDB - Location graph storage
-- RESTful API for route calculation
+### Database
+- AsyncStorage - Local device storage (no backend required!)
+- A* pathfinding algorithm for route calculation
+- QR code generation scripts for location mapping
 
 ## 🚀 Getting Started
 
@@ -45,27 +47,22 @@ A React Native mobile application that provides indoor navigation for college ca
 
 2. **Install dependencies**
    ```bash
-   npm run install:all
+   npm install
    ```
 
-3. **Set up environment variables**
-
-   Create `backend/.env`:
-   ```env
-   PORT=3000
-   MONGODB_URI=
-   NODE_ENV=development
-   ```
-
-4. **Start MongoDB**
+3. **Generate QR codes**
    ```bash
-   mongod
+   npm run generate:qr
    ```
 
-5. **Seed the database**
+4. **Start the development server**
    ```bash
-   npm run seed:db
+   npm start
    ```
+
+5. **Run on device/simulator**
+   - Scan the QR code with Expo Go app (iOS/Android)
+   - Or press `i` for iOS Simulator / `a` for Android Emulator
 
 6. **Start the backend server**
    ```bash
@@ -84,27 +81,23 @@ A React Native mobile application that provides indoor navigation for college ca
 
 ```
 web-ar-navigation/
-├── mobile/                 # React Native app
-│   ├── src/
-│   │   ├── components/     # Reusable components
-│   │   ├── screens/        # App screens
-│   │   ├── navigation/     # Navigation setup
-│   │   ├── services/       # API services
-│   │   ├── utils/          # Utilities (A* algorithm, etc.)
-│   │   └── hooks/          # Custom React hooks
-│   ├── App.js
-│   └── package.json
-├── backend/                # Node.js backend
-│   ├── src/
-│   │   ├── controllers/    # Route controllers
-│   │   ├── models/         # MongoDB models
-│   │   ├── routes/         # API routes
-│   │   ├── utils/          # Utilities (A* algorithm)
-│   │   └── index.js        # Server entry point
-│   └── package.json
+├── src/                    # React Native app source
+│   ├── components/         # Reusable AR components
+│   ├── screens/            # App screens (QR, AR Navigation, etc.)
+│   ├── services/           # API services (local database)
+│   ├── database/           # Local AsyncStorage database service
+│   ├── utils/              # Utilities (A* algorithm, navigation)
+│   └── types/              # TypeScript type definitions
+├── assets/                 # App assets (icons, images)
+├── __tests__/              # Unit tests
 ├── scripts/                # Utility scripts
 │   ├── generate-qr.js      # QR code generator
-│   └── seed-db.js          # Database seeding
+│   ├── verify-qr-db-match.js # QR/DB verification
+│   └── clear-app-cache.js  # Cache clearing utility
+├── qr-codes/               # Generated QR codes
+├── docs/                   # Documentation
+├── App.tsx                 # App entry point
+├── package.json            # Dependencies and scripts
 └── README.md
 ```
 
@@ -120,7 +113,7 @@ web-ar-navigation/
 
 ### Unit Tests
 ```bash
-cd mobile && npm test
+npm test
 cd backend && npm test
 ```
 

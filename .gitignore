@@ -36,9 +36,6 @@ backend/dist/
 backend/logs/
 *.log
 
-# Database
-*.db
-*.sqlite
 
 # Environment variables
 .env
@@ -62,10 +59,7 @@ dist/
 *.apk
 *.ipa
 
-# QR Code outputs
-qr-codes/
-*.png
-*.jpg
+
 
 # Testing
 coverage/

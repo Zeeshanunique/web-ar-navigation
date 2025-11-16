@@ -1,0 +1,5 @@
+Location: Seminar Hall
+ID: seminar_hall
+QR Data: {"locationId":"seminar_hall"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

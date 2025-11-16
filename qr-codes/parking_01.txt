@@ -1,0 +1,5 @@
+Location: Parking Lot
+ID: parking_01
+QR Data: {"locationId":"parking_01"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

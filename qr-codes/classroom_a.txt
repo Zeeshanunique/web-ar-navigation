@@ -1,0 +1,5 @@
+Location: Classroom Block A
+ID: classroom_a
+QR Data: {"locationId":"classroom_a"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

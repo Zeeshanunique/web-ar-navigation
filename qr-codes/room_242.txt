@@ -1,0 +1,5 @@
+Location: Room 242
+ID: room_242
+QR Data: {"locationId":"room_242"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

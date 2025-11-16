@@ -1,0 +1,5 @@
+Location: Laboratory
+ID: lab
+QR Data: {"locationId":"lab"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

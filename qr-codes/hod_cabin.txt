@@ -1,0 +1,5 @@
+Location: HOD Cabin
+ID: hod_cabin
+QR Data: {"locationId":"hod_cabin"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

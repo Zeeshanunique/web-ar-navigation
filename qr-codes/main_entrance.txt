@@ -1,0 +1,5 @@
+Location: Main Entrance
+ID: main_entrance
+QR Data: {"locationId":"main_entrance"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

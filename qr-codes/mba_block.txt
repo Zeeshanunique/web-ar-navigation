@@ -1,0 +1,5 @@
+Location: MBA Block
+ID: mba_block
+QR Data: {"locationId":"mba_block"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)

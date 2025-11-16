@@ -1,0 +1,5 @@
+Location: AIML Staff Room
+ID: aiml_staff_room
+QR Data: {"locationId":"aiml_staff_room"}
+
+Note: GPS coordinates are stored in the app database (DatabaseService.ts)
