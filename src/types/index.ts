@@ -26,6 +26,8 @@ export interface Destination {
 export interface Waypoint {
   x: number;
   y: number;
+  latitude?: number;
+  longitude?: number;
   instruction?: string;
   distance?: number;
 }

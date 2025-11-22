@@ -1,54 +1,33 @@
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Path, Polygon, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { 
-  calculateBearing, 
-  calculateDistance, 
-  formatDistance,
-} from '../utils/navigationUtils';
-import type { Waypoint, Position } from '../types';
+import { View, Text, StyleSheet } from 'react-native';
+import Svg, { Polygon, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { formatDistance } from '../utils/navigationUtils';
 
 interface FloorAROverlayProps {
-  path: Waypoint[];
-  currentPosition: Position;
-  heading: number;
+  distanceToNext: number; // meters
+  relativeBearing: number; // degrees (-180 to 180)
+  targetBearing: number; // absolute bearing (for display)
   screenWidth: number;
   screenHeight: number;
-  currentStep?: number;
+  devicePitch?: number;
 }
 
 const FloorAROverlay: React.FC<FloorAROverlayProps> = memo(({
-  path,
-  currentPosition,
-  heading,
+  distanceToNext,
+  relativeBearing,
+  targetBearing,
   screenWidth,
   screenHeight,
-  currentStep = 0,
+  devicePitch = 0,
 }) => {
-  const { floorArrows, nextWaypointInfo } = useMemo(() => {
-    if (!path || path.length === 0 || !currentPosition) {
-      return { floorArrows: [], nextWaypointInfo: null };
-    }
-
-    const upcomingPath = path.slice(currentStep);
+  const floorArrows = useMemo(() => {
     const MAX_ARROW_DISTANCE = 20; // Show arrows up to 20m ahead
     const ARROW_SPACING = 2; // Space between arrows (meters)
     
-    const nextWaypoint = upcomingPath[0];
-    if (!nextWaypoint) {
-      return { floorArrows: [], nextWaypointInfo: null };
-    }
-
-    const totalDistance = calculateDistance(currentPosition, nextWaypoint);
-    const bearing = calculateBearing(currentPosition, nextWaypoint);
-    
-    // Calculate relative bearing (difference between waypoint direction and current heading)
-    let relativeBearing = bearing - (heading * 180 / Math.PI); // Convert heading to degrees
-    while (relativeBearing > 180) relativeBearing -= 360;
-    while (relativeBearing < -180) relativeBearing += 360;
+    if (distanceToNext <= 1) return []; // Too close
 
     // Generate floor arrows
-    const numArrows = Math.min(Math.floor(totalDistance / ARROW_SPACING), 10);
+    const numArrows = Math.min(Math.floor(distanceToNext / ARROW_SPACING), 10);
     const arrows = [];
 
     for (let i = 0; i < numArrows; i++) {
@@ -61,7 +40,8 @@ const FloorAROverlay: React.FC<FloorAROverlayProps> = memo(({
         distanceFromUser,
         relativeBearing,
         screenWidth,
-        screenHeight
+        screenHeight,
+        devicePitch
       );
 
       if (screenPos) {
@@ -73,14 +53,8 @@ const FloorAROverlay: React.FC<FloorAROverlayProps> = memo(({
       }
     }
 
-    const nextInfo = {
-      distance: formatDistance(totalDistance),
-      bearing: Math.round(bearing),
-      relativeBearing: Math.round(relativeBearing),
-    };
-
-    return { floorArrows: arrows, nextWaypointInfo: nextInfo };
-  }, [path, currentPosition, heading, screenWidth, screenHeight, currentStep]);
+    return arrows;
+  }, [distanceToNext, relativeBearing, screenWidth, screenHeight, devicePitch]);
 
   if (floorArrows.length === 0) {
     return null;
@@ -118,20 +92,18 @@ const FloorAROverlay: React.FC<FloorAROverlayProps> = memo(({
       </Svg>
       
       {/* Info panel at bottom */}
-      {nextWaypointInfo && (
-        <View style={styles.infoPanel}>
-          <View style={styles.distanceContainer}>
-            <Text style={styles.distanceLabel}>DISTANCE</Text>
-            <Text style={styles.distanceValue}>{nextWaypointInfo.distance}</Text>
-          </View>
-          <View style={styles.bearingContainer}>
-            <Text style={styles.bearingLabel}>
-              {getTurnDirection(nextWaypointInfo.relativeBearing)}
-            </Text>
-            <Text style={styles.bearingValue}>{nextWaypointInfo.bearing}°</Text>
-          </View>
+      <View style={styles.infoPanel}>
+        <View style={styles.distanceContainer}>
+          <Text style={styles.distanceLabel}>DISTANCE</Text>
+          <Text style={styles.distanceValue}>{formatDistance(distanceToNext)}</Text>
         </View>
-      )}
+        <View style={styles.bearingContainer}>
+          <Text style={styles.bearingLabel}>
+            {getTurnDirection(relativeBearing)}
+          </Text>
+          <Text style={styles.bearingValue}>{Math.round(targetBearing)}°</Text>
+        </View>
+      </View>
       
       {/* Horizon line for reference */}
       <View style={[styles.horizonLine, { top: screenHeight * 0.4 }]} />
@@ -146,7 +118,8 @@ const projectFloorArrowToScreen = (
   distanceFromUser: number,
   relativeBearing: number,
   screenWidth: number,
-  screenHeight: number
+  screenHeight: number,
+  devicePitch: number
 ) => {
   // Only show arrows within FOV
   const FOV = 45; // Field of view
@@ -154,35 +127,33 @@ const projectFloorArrowToScreen = (
     return null;
   }
 
-  // Calculate perspective scaling (closer = larger)
-  const maxDistance = 20;
-  const minScale = 0.2;
-  const maxScale = 1.0;
+  // Calculate vanishing point based on device pitch
+  const verticalFOV = 60;
+  const pixelsPerDegree = screenHeight / verticalFOV;
   
-  const distanceFactor = 1 - (distanceFromUser / maxDistance);
-  const scale = minScale + (distanceFactor * (maxScale - minScale));
+  // Calculate where the horizon (level with ground) is on screen
+  const vanishingPointY = (screenHeight / 2) + ((devicePitch - 90) * pixelsPerDegree);
+
+  const CAMERA_HEIGHT = 1.5; // meters
+  const angleDownToPoint = (Math.atan(CAMERA_HEIGHT / distanceFromUser) * 180) / Math.PI;
   
-  // Calculate Y position (closer arrows appear lower on screen)
-  // This creates the "floor" perspective effect
-  const vanishingPointY = screenHeight * 0.35; // Where arrows converge (horizon)
-  const bottomY = screenHeight * 0.85; // Where closest arrow appears
+  const y = vanishingPointY + (angleDownToPoint * pixelsPerDegree);
   
-  const y = vanishingPointY + (bottomY - vanishingPointY) * distanceFactor;
-  
+  // Don't show if off screen
+  if (y < -100 || y > screenHeight + 100) return null;
+
+  const scale = Math.min(1.2, Math.max(0.2, 2 / distanceFromUser));
+
   // Calculate X position based on relative bearing
-  const lateralOffset = (relativeBearing / FOV) * (screenWidth * 0.4);
-  const x = screenWidth / 2 + lateralOffset * distanceFactor;
+  const lateralOffset = (relativeBearing / FOV) * (screenWidth * 0.8);
+  const x = screenWidth / 2 + lateralOffset;
   
-  // Calculate arrow size based on distance
   const baseWidth = 80;
   const baseHeight = 50;
   const width = baseWidth * scale;
   const height = baseHeight * scale;
   
-  // Calculate opacity (fade distant arrows)
-  const opacity = 0.4 + (distanceFactor * 0.6); // 0.4 to 1.0
-  
-  // Stroke width based on scale
+  const opacity = Math.min(1, Math.max(0, 1 - (distanceFromUser / 20)));
   const strokeWidth = 1 + (scale * 2);
   
   return {
@@ -196,29 +167,15 @@ const projectFloorArrowToScreen = (
   };
 };
 
-/**
- * Create chevron (^) arrow points for polygon
- */
-const createChevronPoints = (
-  x: number,
-  y: number,
-  width: number,
-  height: number
-): string => {
+const createChevronPoints = (x: number, y: number, width: number, height: number): string => {
   const halfWidth = width / 2;
-  const thickness = width * 0.25; // Thickness of the chevron line
+  const thickness = width * 0.25;
   
-  // Chevron pointing up (forward direction)
   const points = [
-    // Top point
     [x, y - height / 2],
-    
-    // Right outer edge
     [x + halfWidth, y + height / 2],
     [x + halfWidth - thickness, y + height / 2],
     [x, y - height / 2 + thickness * 1.5],
-    
-    // Left inner edge
     [x - halfWidth + thickness, y + height / 2],
     [x - halfWidth, y + height / 2],
   ];
@@ -226,21 +183,13 @@ const createChevronPoints = (
   return points.map(p => `${p[0]},${p[1]}`).join(' ');
 };
 
-/**
- * Get turn direction text from relative bearing
- */
 const getTurnDirection = (relativeBearing: number): string => {
   const abs = Math.abs(relativeBearing);
   
-  if (abs < 10) {
-    return 'GO STRAIGHT';
-  } else if (abs < 45) {
-    return relativeBearing > 0 ? 'SLIGHT RIGHT' : 'SLIGHT LEFT';
-  } else if (abs < 90) {
-    return relativeBearing > 0 ? 'TURN RIGHT' : 'TURN LEFT';
-  } else {
-    return relativeBearing > 0 ? 'SHARP RIGHT' : 'SHARP LEFT';
-  }
+  if (abs < 10) return 'GO STRAIGHT';
+  else if (abs < 45) return relativeBearing > 0 ? 'SLIGHT RIGHT' : 'SLIGHT LEFT';
+  else if (abs < 90) return relativeBearing > 0 ? 'TURN RIGHT' : 'TURN LEFT';
+  else return relativeBearing > 0 ? 'SHARP RIGHT' : 'SHARP LEFT';
 };
 
 const styles = StyleSheet.create({
@@ -307,4 +256,3 @@ const styles = StyleSheet.create({
 });
 
 export default FloorAROverlay;
-

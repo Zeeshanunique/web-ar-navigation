@@ -7,7 +7,7 @@ const LOCATIONS_KEY = '@ar_nav_locations';
 const CONNECTIONS_KEY = '@ar_nav_connections';
 const INITIALIZED_KEY = '@ar_nav_initialized';
 const DB_VERSION_KEY = '@ar_nav_db_version';
-const CURRENT_DB_VERSION = '2.1'; // Added Home and Office locations
+const CURRENT_DB_VERSION = '2.2'; // Force reseed for all GPS coordinates
 
 interface StoredLocation extends Location {
   connections?: string[];
@@ -535,6 +535,8 @@ class DatabaseService {
       name: location.name,
       x: location.x,
       y: location.y,
+      latitude: location.latitude,
+      longitude: location.longitude,
       floor: location.floor,
       category: location.category,
       icon: location.icon,
@@ -573,7 +575,12 @@ class DatabaseService {
     const estimatedTime = Math.ceil(totalDistance / 1.4);
 
     return {
-      path: path.map(point => ({ x: point.x, y: point.y })),
+      path: path.map(point => ({ 
+        x: point.x, 
+        y: point.y,
+        latitude: point.latitude,
+        longitude: point.longitude
+      })),
       distance: Math.round(totalDistance * 100) / 100, // Round to 2 decimal places
       steps: path.length,
       estimatedTime,

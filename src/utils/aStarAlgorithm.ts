@@ -7,6 +7,8 @@
 interface NodeData {
   x: number;
   y: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface GraphEdge {
@@ -24,6 +26,8 @@ interface Location {
   id: string;
   x: number;
   y: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface Connection {
@@ -34,6 +38,8 @@ interface Connection {
 interface PathPoint {
   x: number;
   y: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 /**
@@ -43,15 +49,19 @@ class Node {
   id: string;
   x: number;
   y: number;
+  latitude?: number;
+  longitude?: number;
   g: number = 0; // Cost from start to this node
   h: number = 0; // Heuristic cost from this node to goal
   f: number = 0; // Total cost (g + h)
   parent: Node | null = null;
 
-  constructor(id: string, x: number, y: number) {
+  constructor(id: string, x: number, y: number, latitude?: number, longitude?: number) {
     this.id = id;
     this.x = x;
     this.y = y;
+    this.latitude = latitude;
+    this.longitude = longitude;
   }
 
   getF(): number {
@@ -81,7 +91,12 @@ const reconstructPath = (node: Node): PathPoint[] => {
   let current: Node | null = node;
   
   while (current) {
-    path.unshift({ x: current.x, y: current.y });
+    path.unshift({ 
+      x: current.x, 
+      y: current.y,
+      latitude: current.latitude,
+      longitude: current.longitude
+    });
     current = current.parent;
   }
   
@@ -109,8 +124,20 @@ export const aStar = (graph: Graph, startId: string, goalId: string): PathPoint[
   }
 
   // Initialize start and goal nodes
-  const start = new Node(startId, nodes[startId].x, nodes[startId].y);
-  const goal = new Node(goalId, nodes[goalId].x, nodes[goalId].y);
+  const start = new Node(
+    startId, 
+    nodes[startId].x, 
+    nodes[startId].y,
+    nodes[startId].latitude,
+    nodes[startId].longitude
+  );
+  const goal = new Node(
+    goalId, 
+    nodes[goalId].x, 
+    nodes[goalId].y,
+    nodes[goalId].latitude,
+    nodes[goalId].longitude
+  );
 
   // Open set: nodes to be evaluated
   const openSet: Node[] = [start];
@@ -158,7 +185,13 @@ export const aStar = (graph: Graph, startId: string, goalId: string): PathPoint[
       }
 
       // Create neighbor node
-      const neighbor = new Node(neighborId, neighborData.x, neighborData.y);
+      const neighbor = new Node(
+        neighborId, 
+        neighborData.x, 
+        neighborData.y,
+        neighborData.latitude,
+        neighborData.longitude
+      );
       neighbor.parent = current;
 
       // Calculate g score (cost from start to neighbor)
@@ -199,6 +232,8 @@ export const createGraph = (locations: Location[], connections: Connection[]): G
     nodes[location.id] = {
       x: location.x,
       y: location.y,
+      latitude: location.latitude,
+      longitude: location.longitude,
     };
   });
 

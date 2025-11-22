@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,271 +10,114 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { throttle } from 'lodash';
-import EnhancedARPathOverlay from '../components/EnhancedARPathOverlay';
+import { DeviceMotion } from 'expo-sensors';
 import FloorAROverlay from '../components/FloorAROverlay';
-import { calculateBearing, calculateDistance, isNearWaypoint } from '../utils/navigationUtils';
-import { useNavigation as useNavigationContext } from '../context/NavigationContext';
-import hybridNavigationService, { type TrackingMode } from '../services/HybridNavigationService';
-import type { ARNavigationScreenProps, DeviceOrientation, Position, Waypoint } from '../types';
+import geoNavigationService, { NavigationState, GeoWaypoint } from '../services/GeoNavigationService';
+import type { ARNavigationScreenProps } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Tracking configuration
-const RENDER_THROTTLE_INTERVAL = 50; // ms
-
-interface TrackingInfo {
-  mode: TrackingMode;
-  accuracy: number;
-}
-
-const ARNavigationScreen: React.FC<ARNavigationScreenProps> = ({ navigation, route: navRoute }) => {
-  const { path, currentLocation, destination } = navRoute.params || {};
-  const { state, actions } = useNavigationContext();
+const ARNavigationScreen: React.FC<ARNavigationScreenProps> = ({ navigation, route }) => {
+  const { path, currentLocation, destination } = route.params || {};
+  
   const [permission, requestPermission] = useCameraPermissions();
-  const [currentStep, setCurrentStep] = useState<number>(0);
-  const [deviceOrientation, setDeviceOrientation] = useState<DeviceOrientation>({ x: 0, y: 0, z: 0 });
-  const [heading, setHeading] = useState<number>(0);
-  const [currentPosition, setCurrentPosition] = useState<Position | null>(
-    currentLocation ? { x: currentLocation.x, y: currentLocation.y } : null
-  );
-  const [trackingInfo, setTrackingInfo] = useState<TrackingInfo>({
-    mode: 'arcore',
-    accuracy: 0.5,
-  });
+  const [devicePitch, setDevicePitch] = useState<number>(0);
+  const [navState, setNavState] = useState<NavigationState | null>(null);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
+  // 1. Initialize Navigation Service
   useEffect(() => {
     if (permission && !permission.granted) {
       requestPermission();
     }
-    if (permission?.granted) {
-      initializeHybridTracking();
+    
+    // Request motion permissions for iOS
+    const requestMotionPermission = async () => {
+      try {
+        const { status } = await DeviceMotion.getPermissionsAsync();
+        if (status !== 'granted') {
+          await DeviceMotion.requestPermissionsAsync();
+        }
+      } catch (e) {
+        // Ignore if not required
+      }
+    };
+    requestMotionPermission();
+
+    if (permission?.granted && path) {
+      startNavigation();
     }
+
     return () => {
-      // Cleanup hybrid tracking
-      hybridNavigationService.stopTracking();
-      actions.stopNavigation();
+      geoNavigationService.stopTracking();
     };
   }, [permission]);
 
-  const initializeHybridTracking = async () => {
+  // 2. Track Device Pitch (Local UI only)
+  useEffect(() => {
+    DeviceMotion.setUpdateInterval(50);
+    const subscription = DeviceMotion.addListener((data) => {
+      if (data.rotation) {
+        // Beta is front-to-back tilt in radians
+        const pitchDegrees = (data.rotation.beta * 180) / Math.PI;
+        setDevicePitch(pitchDegrees);
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const startNavigation = async () => {
     try {
       setIsInitializing(true);
-
-      console.log('🔧 Initializing tracking with currentLocation:', currentLocation);
-
-      // Initialize hybrid navigation (auto-detects best mode)
-      const status = await hybridNavigationService.initialize();
       
-      setTrackingInfo({
-        mode: status.mode,
-        accuracy: status.accuracy,
-      });
+      // Convert path to GeoWaypoints
+      const geoPath: GeoWaypoint[] = path.map(p => ({
+        latitude: p.latitude || 0, // Fallback 0 if missing (should verify)
+        longitude: p.longitude || 0,
+      })).filter(p => p.latitude !== 0 && p.longitude !== 0);
 
-      console.log(`✅ Tracking initialized: ${status.mode} (±${status.accuracy}m)`);
-
-      // Calibrate with QR code GPS and map coordinates
-      if (currentLocation?.latitude && currentLocation?.longitude) {
-        console.log('📍 Calibrating with:', {
-          lat: currentLocation.latitude,
-          lon: currentLocation.longitude,
-          x: currentLocation.x,
-          y: currentLocation.y,
-        });
-        
-        hybridNavigationService.calibratePosition(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          currentLocation.x,
-          currentLocation.y
-        );
-        
-        // Force set initial position
-        setCurrentPosition({
-          x: currentLocation.x,
-          y: currentLocation.y,
-        });
-        console.log('✅ Initial position set:', { x: currentLocation.x, y: currentLocation.y });
+      if (geoPath.length < 2) {
+        Alert.alert('Error', 'Route missing GPS coordinates');
+        navigation.goBack();
+        return;
       }
 
-      // Start tracking
-      await hybridNavigationService.startTracking((position: Position) => {
-        console.log('📍 Position update received:', position);
-        setCurrentPosition(position);
+      geoNavigationService.startNavigation(geoPath);
+      
+      await geoNavigationService.startTracking((state) => {
+        setNavState(state);
         
-        // Also update navigation context
-        actions.updatePosition(position);
-        
-        // Update heading (ARCore provides heading, otherwise use magnetometer)
-        const newHeading = hybridNavigationService.getCurrentHeading();
-        setHeading(newHeading);
-        console.log('🧭 Heading updated:', newHeading);
+        if (state.isArrived) {
+           handleArrival();
+        }
       });
-
-      // Initialize navigation context
-      actions.setCurrentLocation(currentLocation || null);
-      actions.setDestination(destination || null);
-      actions.setPath(path || []);
-      actions.startNavigation();
-
-      // Debug: Show path info
-      if (path && path.length > 0) {
-        console.log('🗺️  Navigation Path:');
-        path.forEach((waypoint, index) => {
-          console.log(`  ${index}. Waypoint at (${waypoint.x}, ${waypoint.y})`);
-        });
-      }
 
       setIsInitializing(false);
-      console.log('✅ Tracking fully initialized and started');
     } catch (error) {
-      console.error('❌ Navigation initialization failed:', error);
+      console.error("Failed to start navigation:", error);
+      Alert.alert('Error', 'Could not start GPS navigation');
       setIsInitializing(false);
-      Alert.alert('Initialization Error', 'Failed to start navigation tracking');
     }
   };
 
-  // Position updates are now handled by HybridNavigationService
-  // No need for separate GPS initialization
-
-  // Initialize current position from path
-  useEffect(() => {
-    if (path && path.length > 0 && !currentPosition) {
-      setCurrentPosition({ x: path[0].x, y: path[0].y });
-    }
-  }, [path]);
-
-  // Auto-advance waypoints when user gets close + Arrival detection
-  useEffect(() => {
-    if (!currentPosition || !path || path.length === 0) return;
-
-    const nextWaypointIndex = currentStep + 1;
-    if (nextWaypointIndex < path.length) {
-      const nextWaypoint = path[nextWaypointIndex];
-      const distance = calculateDistance(currentPosition, nextWaypoint);
-      
-      // Auto-advance if within 3 meters (intelligent threshold)
-      if (distance <= 3) {
-        setCurrentStep(nextWaypointIndex);
-        setCurrentPosition({ x: nextWaypoint.x, y: nextWaypoint.y });
-        console.log(`✅ Auto-advanced to waypoint ${nextWaypointIndex}, ${distance.toFixed(1)}m away`);
-      }
-    } else if (nextWaypointIndex === path.length) {
-      // Check if reached final destination (within 5 meters)
-      const finalDestination = path[path.length - 1];
-      const distance = calculateDistance(currentPosition, finalDestination);
-      
-      console.log(`🎯 Distance to destination: ${distance.toFixed(1)}m`);
-      
-      if (distance <= 5) {
-        Alert.alert(
-          '🎉 Destination Reached!',
-          `You have arrived at ${destination?.name || 'your destination'}.\n\nDistance: ${distance.toFixed(1)}m`,
-          [
-            {
-              text: 'Navigate Again',
-              onPress: () => navigation.navigate('Destination'),
-            },
-            {
-              text: 'Go Home',
-              onPress: () => navigation.navigate('Home'),
-            },
-          ]
-        );
-      }
-    }
-  }, [currentPosition, currentStep, path, destination, navigation]);
-
-  // All sensor tracking is now handled by HybridNavigationService
-  // No need for manual sensor setup
-
-  const getNextWaypoint = (): Waypoint | null => {
-    if (!path || path.length === 0) return null;
-    if (currentStep >= path.length - 1) return null;
-    return path[currentStep + 1];
-  };
-
-  const getCurrentWaypoint = (): Position | null => {
-    // Use tracked current position instead of fixed waypoint
-    if (currentPosition) return currentPosition;
-    if (!path || path.length === 0) return null;
-    return path[currentStep];
-  };
-
-  const handleNextStep = (): void => {
-    // Manual step advance (still available but auto-advance is primary)
-    if (path && currentStep < path.length - 1) {
-      const nextStep = currentStep + 1;
-      setCurrentStep(nextStep);
-      if (path[nextStep]) {
-        setCurrentPosition({ x: path[nextStep].x, y: path[nextStep].y });
-      }
-    } else {
-      Alert.alert(
-        'Destination Reached!',
-        `You have arrived at ${destination?.name || 'your destination'}.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('Home'),
-          },
-        ]
-      );
-    }
-  };
-
-  const handleSwitchMode = async (): Promise<void> => {
+  const handleArrival = () => {
+    geoNavigationService.stopTracking();
     Alert.alert(
-      'ARCore Only',
-      'This app uses only ARCore for tracking. No fallback modes available for maximum accuracy.',
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleRecalibrate = (): void => {
-    Alert.alert(
-      'Recalibrate Position',
-      'Scan a QR code to recalibrate your position',
+      '🎉 Destination Reached!',
+      `You have arrived at ${destination?.name || 'your destination'}.`,
       [
         {
-          text: 'Scan QR Code',
-          onPress: () => {
-            navigation.navigate('QRScanner', {
-              isRecalibration: true,
-              returnTo: 'ARNavigation',
-              returnParams: { path, currentLocation, destination },
-            });
-          },
+          text: 'Go Home',
+          onPress: () => navigation.navigate('Home'),
         },
-        { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
 
-  const nextWaypoint = getNextWaypoint();
-  const pathProgress = path ? `${currentStep + 1}/${path.length}` : '0/0';
-
-  // Memoized calculations for performance
-  const memoizedPath = useMemo(() => path || [], [path]);
-  const memoizedCurrentPosition = useMemo(() => currentPosition, [currentPosition]);
-
-  // Display tracking mode (ARCore only)
-  const trackingModeDisplay = '🎯 ARCore Tracking';
-
-  if (!permission) {
+  if (!permission || !permission.granted) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Requesting camera permission...</Text>
-      </View>
-    );
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.message}>We need your permission to use the camera for AR navigation</Text>
+        <Text style={styles.message}>Camera permission required</Text>
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
@@ -286,16 +129,16 @@ const ARNavigationScreen: React.FC<ARNavigationScreenProps> = ({ navigation, rou
     <SafeAreaView style={styles.container}>
       <CameraView style={styles.camera} />
       
-      {/* AR Overlay - Absolutely positioned */}
-      {memoizedCurrentPosition && (
+      {/* AR Overlay */}
+      {navState && !isInitializing && (
         <View style={styles.arOverlay}>
           <FloorAROverlay
-            path={memoizedPath}
-            currentPosition={memoizedCurrentPosition}
-            heading={heading}
+            distanceToNext={navState.distanceToNext}
+            relativeBearing={navState.relativeBearing}
+            targetBearing={navState.bearingToNext}
             screenWidth={SCREEN_WIDTH}
             screenHeight={SCREEN_HEIGHT}
-            currentStep={currentStep}
+            devicePitch={devicePitch}
           />
         </View>
       )}
@@ -303,62 +146,40 @@ const ARNavigationScreen: React.FC<ARNavigationScreenProps> = ({ navigation, rou
       {/* Top Info Panel */}
       <View style={styles.topPanel}>
         <View style={styles.infoContainer}>
-          <Text style={styles.infoText}>Progress: {pathProgress}</Text>
           <Text style={styles.infoText}>
-            Heading: {Math.round(heading)}°
+            Step: {navState ? navState.currentStepIndex : 0} / {navState ? navState.totalSteps : 0}
           </Text>
           <Text style={styles.infoText}>
-            {trackingModeDisplay}
+            GPS Accuracy: {navState?.currentLocation.accuracy?.toFixed(0)}m
+          </Text>
+          <Text style={styles.infoText}>
+            Compass: {Math.round(navState?.heading || 0)}°
           </Text>
         </View>
       </View>
 
-      {/* Bottom Control Panel */}
-      <View style={styles.bottomPanel}>
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity 
-            style={[styles.controlButton, styles.calibrateButton]}
-            onPress={handleRecalibrate}
-          >
-            <Text style={styles.controlButtonText}>Recalibrate</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.controlButton, styles.nextButton]}
-            onPress={handleNextStep}
-          >
-            <Text style={styles.controlButtonText}>Next Step</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.controlButton, styles.infoButton]}
-            onPress={handleSwitchMode}
-          >
-            <Text style={styles.controlButtonText}>
-              Info
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {nextWaypoint && (
-          <View style={styles.waypointInfo}>
-            <Text style={styles.waypointText}>
-              Next: {Math.round(calculateDistance(
-                memoizedCurrentPosition || { x: 0, y: 0 }, 
-                nextWaypoint
-              ))}m away
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Back Button */}
+      {/* Close/Stop Button (Top Left) */}
       <TouchableOpacity 
-        style={styles.backButton}
+        style={styles.closeButton}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.backButtonText}>← Back</Text>
+        <Text style={styles.closeButtonText}>✕ Stop</Text>
       </TouchableOpacity>
+
+      {/* Manual Next Step Button (Top Right) */}
+      <TouchableOpacity 
+        style={styles.nextButton}
+        onPress={() => geoNavigationService.skipToNextWaypoint()}
+      >
+        <Text style={styles.nextButtonText}>Next ➔</Text>
+      </TouchableOpacity>
+      
+      {isInitializing && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#00FF88" />
+          <Text style={styles.loadingText}>Acquiring GPS...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -373,13 +194,12 @@ const styles = StyleSheet.create({
   },
   arOverlay: {
     ...StyleSheet.absoluteFillObject,
-    pointerEvents: 'none', // Allow touches to pass through to UI elements
+    pointerEvents: 'none',
   },
   message: {
+    color: 'white',
     textAlign: 'center',
-    paddingBottom: 10,
-    color: '#fff',
-    fontSize: 18,
+    marginTop: 100,
   },
   button: {
     backgroundColor: '#007AFF',
@@ -390,21 +210,13 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     textAlign: 'center',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loadingText: {
-    color: '#fff',
-    textAlign: 'center',
-    marginTop: 10,
-    fontSize: 16,
   },
   topPanel: {
     position: 'absolute',
-    top: 50,
+    top: 100,
     left: 20,
     right: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 10,
     padding: 10,
   },
@@ -417,62 +229,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  bottomPanel: {
+  closeButton: {
     position: 'absolute',
-    bottom: 50,
+    top: 60,
     left: 20,
-    right: 20,
+    backgroundColor: 'rgba(255, 59, 48, 0.9)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 10, // Ensure it's above other elements
   },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  controlButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 25,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  calibrateButton: {
-    backgroundColor: 'rgba(255, 149, 0, 0.9)',
-  },
-  nextButton: {
-    backgroundColor: 'rgba(52, 199, 89, 0.9)',
-  },
-  infoButton: {
-    backgroundColor: 'rgba(90, 200, 250, 0.9)',
-  },
-  controlButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  waypointInfo: {
-    backgroundColor: 'rgba(44, 62, 80, 0.9)',
-    borderRadius: 10,
-    padding: 10,
-    alignItems: 'center',
-  },
-  waypointText: {
+  closeButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
   },
-  backButton: {
+  nextButton: {
     position: 'absolute',
     top: 60,
-    left: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    right: 20,
+    backgroundColor: 'rgba(52, 199, 89, 0.9)',
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 20,
+    zIndex: 10,
   },
-  backButtonText: {
+  nextButtonText: {
     color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#00FF88',
+    marginTop: 10,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 
