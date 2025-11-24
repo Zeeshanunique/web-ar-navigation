@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { calculateGPSDistance, calculateGPSBearing } from '../utils/navigationUtils';
+import { voiceService } from './VoiceService';
 
 export interface GeoPosition {
   latitude: number;
@@ -62,6 +63,7 @@ class GeoNavigationService {
     }
     
     console.log(`🚀 GeoNavigation started. Path length: ${path.length}. Target: ${this.currentStepIndex}`);
+    voiceService.speak("Navigation started. Proceed to the first waypoint.");
   }
 
   /**
@@ -103,6 +105,7 @@ class GeoNavigationService {
       this.headingSubscription.remove();
       this.headingSubscription = null;
     }
+    voiceService.stop();
   }
 
   private handleLocationUpdate(location: Location.LocationObject) {
@@ -186,14 +189,22 @@ class GeoNavigationService {
             if (distance < 8) {
                 this.currentState.isArrived = true;
                 console.log("🎉 Arrived at destination!");
+                voiceService.announceArrival();
             }
         } else {
+            const previousBearing = this.currentState.bearingToNext;
+
             this.currentStepIndex++;
             console.log(`✅ Reached waypoint ${this.currentStepIndex - 1}. advancing to ${this.currentStepIndex}`);
             
             // Immediately update logic for the NEW target to snap the arrow
             // This makes the arrow change direction "instantly" upon arrival
             this.updateNavigationLogic();
+            
+            // Announce turn
+            const newBearing = this.currentState.bearingToNext;
+            voiceService.announceTurn(newBearing - previousBearing);
+
             return; 
         }
     }
@@ -209,14 +220,20 @@ class GeoNavigationService {
     if (!this.path || this.path.length === 0) return;
 
     if (this.currentStepIndex < this.path.length - 1) {
+      const previousBearing = this.currentState.bearingToNext;
+
       this.currentStepIndex++;
       console.log(`⏩ Manually advanced to waypoint ${this.currentStepIndex}`);
       // Immediately update logic for the NEW target
       this.updateNavigationLogic();
+      
+      const newBearing = this.currentState.bearingToNext;
+      voiceService.announceTurn(newBearing - previousBearing);
     } else {
       // If at the last waypoint, finish navigation
       this.currentState.isArrived = true;
       this.notifyUpdate();
+      voiceService.announceArrival();
     }
   }
 
